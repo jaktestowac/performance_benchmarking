@@ -31,16 +31,50 @@ jobs:
       matrix:
         # run copies of the current job in parallel
         containers: [1, 2, 3, 4, 5]
-    steps:
+
+      steps:
       - uses: actions/checkout@v3
-      - name: Setup Node
-        run: sudo apt install nodejs
-      - name: Setup NPM
-        run: sudo apt install npm
-      - name: Versions
-        run: node -v && npm -v
-      - name: npm-install
-        run: npm install
+      - uses: actions/setup-node@v3
+        with:
+          node-version: 18
+
+      - name: Use cache node modules
+        id: cache-npm
+        uses: actions/cache@v3
+        env:
+          cache-name: cache-node-modules
+        with:
+          # npm cache files are stored in `~/.npm` on Linux/macOS
+          path: ./${{env.PROJECT}}/node_modules
+          key: ${{ runner.os }}-build-${{ env.cache-name }}-${{ hashFiles('**/package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-build-${{ env.cache-name }}-
+            ${{ runner.os }}-build-
+            ${{ runner.os }}-
+
+      - name: npm ci
+        if: steps.cache-npm.outputs.cache-hit != 'true'
+        run: npm ci
+        
+      # START PW cache
+      # It depend on cached node modules in previous steps
+      - name: Get installed Playwright version
+        id: playwright-version
+        # run: echo "PLAYWRIGHT_VERSION=$(node -e "console.log(require('./package-lock.json').dependencies['@playwright/test'].version)")" >> $GITHUB_ENV
+        run: echo "PLAYWRIGHT_VERSION=$(node -e "console.log(require('@playwright/test/package.json').version)")" >> $GITHUB_ENV
+
+      - name: Cache playwright binaries
+        uses: actions/cache@v3
+        id: playwright-cache
+        with:
+          path: |
+            ~/.cache/ms-playwright
+          key: |
+            ${{ runner.os }}-playwright-${{ env.PLAYWRIGHT_VERSION }}
+
+      - name: Install Playwright and dependencies
+        run: npx playwright install --with-deps chromium
+        if: steps.playwright-cache.outputs.cache-hit != 'true'
       - name: Post LS
         run: ls
       - name: Install Playwright Browsers

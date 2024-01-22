@@ -32,12 +32,13 @@ jobs:
         # run copies of the current job in parallel
         containers: [1, 2, 3, 4, 5]
 
-      steps:
+    steps:
       - uses: actions/checkout@v3
       - uses: actions/setup-node@v3
         with:
           node-version: 18
 
+    # Node cache strategy https://docs.github.com/en/actions/using-workflows/caching-dependencies-to-speed-up-workflows
       - name: Use cache node modules
         id: cache-npm
         uses: actions/cache@v3
@@ -56,6 +57,7 @@ jobs:
         if: steps.cache-npm.outputs.cache-hit != 'true'
         run: npm ci
         
+
       # START PW cache
       # It depend on cached node modules in previous steps
       - name: Get installed Playwright version
@@ -72,6 +74,9 @@ jobs:
           key: |
             ${{ runner.os }}-playwright-${{ env.PLAYWRIGHT_VERSION }}
 
+      - name: Install Playwright and dependencies
+        run: npx playwright install --with-deps chromium
+        if: steps.playwright-cache.outputs.cache-hit != 'true'
       - name: Install Playwright and dependencies
         run: npx playwright install --with-deps chromium
         if: steps.playwright-cache.outputs.cache-hit != 'true'
